@@ -5,6 +5,7 @@ import { WebrtcProvider } from '../src/y-webrtc.js'
 // @ts-ignore
 import { MonacoBinding } from 'y-monaco'
 import * as monaco from 'monaco-editor'
+import { Centrifuge } from 'centrifuge'
 
 self.MonacoEnvironment = {
   getWorkerUrl: function (moduleId, label) {
@@ -26,7 +27,39 @@ self.MonacoEnvironment = {
 
 window.addEventListener('load', () => {
   const ydoc = new Y.Doc()
-  const provider = new WebrtcProvider('monaco', ydoc, { signaling: ['ws://localhost:4444'] })
+  const centrifuge = new Centrifuge('ws://127.0.0.1:8089/connection/websocket', {
+    token: 'YOUR_TOKEN',
+    websocket: window.WebSocket
+  })
+  centrifuge
+    .on('connecting', function (ctx) {
+      console.log(`connecting: ${ctx.code}, ${ctx.reason}`)
+    })
+    .on('connected', function (ctx) {
+      console.log(`connected over ${ctx.transport}`)
+    })
+    .on('disconnected', function (ctx) {
+      console.log(`disconnected: ${ctx.code}, ${ctx.reason}`)
+    })
+    .connect()
+
+  const sub = centrifuge.newSubscription('signal')
+
+  sub
+    .on('publication', function (ctx) {
+      console.log('publication', ctx.data)
+    })
+    .on('subscribing', function (ctx) {
+      console.log(`subscribing: ${ctx.code}, ${ctx.reason}`)
+    })
+    .on('subscribed', function (ctx) {
+      console.log('subscribed', ctx)
+    })
+    .on('unsubscribed', function (ctx) {
+      console.log(`unsubscribed: ${ctx.code}, ${ctx.reason}`)
+    })
+    .subscribe()
+  const provider = new WebrtcProvider('monaco', ydoc)
   const type = ydoc.getText('monaco')
 
   const editor = monaco.editor.create(/** @type {HTMLElement} */ (document.getElementById('monaco-editor')), {
